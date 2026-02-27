@@ -150,7 +150,6 @@ def start(update, context):
         VALUES(?,?,?,?,?,?,?)
         """, (uid,0,0,"Member",0,inviter,None))
 
-        # نقاط الدعوة
         if inviter and inviter != uid:
             cursor.execute("SELECT vip FROM users WHERE user_id=?", (inviter,))
             vip_status = cursor.fetchone()[0] or 0
@@ -161,7 +160,6 @@ def start(update, context):
             WHERE user_id=?""", (bonus, inviter))
 
     backup()
-
     update.message.reply_text(
         "👑 EMPIRE PRO MAX ACTIVE",
         reply_markup=menu(uid)
@@ -174,7 +172,6 @@ def user(update, context):
     if not anti(uid):
         return
 
-    # ---------- المهام ----------
     if text == "💰 المهام":
         cursor.execute("SELECT * FROM tasks")
         tasks = cursor.fetchall()
@@ -185,19 +182,16 @@ def user(update, context):
             kb = InlineKeyboardMarkup([[InlineKeyboardButton("🚀 تنفيذ", callback_data=f"task_{t[0]}")]])
             update.message.reply_text(f"{t[1]}\n{t[2]}\n💰 {t[3]} نقطة", reply_markup=kb)
 
-    # ---------- الحساب ----------
     elif text == "👤 حسابي":
         cursor.execute("SELECT points,referrals,level,vip FROM users WHERE user_id=?", (uid,))
         p,r,l,vip = cursor.fetchone()
         vip_text = "💎 VIP" if vip == 1 else "Member"
         update.message.reply_text(f"👤 حسابك\n💰 نقاط: {p}\n👥 دعوات: {r}\n🏆 المستوى: {l}\n{vip_text}")
 
-    # ---------- الدعوات ----------
     elif text == "👥 دعوة":
         link = f"https://t.me/{context.bot.username}?start={uid}"
         update.message.reply_text(f"رابطك:\n{link}\n🎁 20 نقطة لكل دعوة (VIP = 40)")
 
-    # ---------- المستوى ----------
     elif text == "🏆 مستواي":
         cursor.execute("SELECT points FROM users WHERE user_id=?", (uid,))
         pts = cursor.fetchone()[0]
@@ -206,7 +200,6 @@ def user(update, context):
         backup()
         update.message.reply_text(f"🏆 مستواك الحالي:\n{lv}")
 
-    # ---------- سحب ----------
     elif text == "💵 سحب":
         cursor.execute("SELECT points FROM users WHERE user_id=?", (uid,))
         pts = cursor.fetchone()[0]
@@ -219,7 +212,6 @@ def user(update, context):
         context.bot.send_message(ADMIN_ID, f"💵 طلب سحب من {uid}")
         update.message.reply_text("✅ تم إرسال الطلب")
 
-    # ---------- VIP ----------
     elif text == "💎 VIP":
         cursor.execute("SELECT vip,points FROM users WHERE user_id=?", (uid,))
         vip, pts = cursor.fetchone()
@@ -233,7 +225,6 @@ def user(update, context):
         backup()
         update.message.reply_text("🎉 تم ترقيتك إلى VIP بنجاح!")
 
-    # ---------- الإحصائيات ----------
     elif text == "📊 الإحصائيات" and uid == ADMIN_ID:
         cursor.execute("SELECT COUNT(*),SUM(points),SUM(referrals) FROM users")
         total_users, total_points, total_refs = cursor.fetchone()
@@ -246,7 +237,6 @@ def user(update, context):
             text += f"{i}. {u[0]} - {u[1]} نقطة\n"
         update.message.reply_text(text)
 
-    # ---------- ADMIN PANEL ----------
     elif text == "⚙️ لوحة التحكم" and uid == ADMIN_ID:
         update.message.reply_text("""
 👑 ADMIN PANEL
