@@ -2,9 +2,7 @@ import sqlite3
 import os
 import shutil
 import time
-from datetime import date
-
-from telegram import *
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -14,18 +12,20 @@ from telegram.ext import (
     filters,
 )
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME")
-ADMIN_ID = int(os.environ.get("ADMIN_ID"))
+# ================= ENV =================
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
-DB="empire.db"
-BACKUP="backup.db"
+# ================= DATABASE =================
+DB = "empire.db"
+BACKUP = "backup.db"
 
 if not os.path.exists(DB) and os.path.exists(BACKUP):
-    shutil.copy(BACKUP,DB)
+    shutil.copy(BACKUP, DB)
 
-conn=sqlite3.connect(DB,check_same_thread=False)
-cursor=conn.cursor()
+conn = sqlite3.connect(DB, check_same_thread=False)
+cursor = conn.cursor()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users(
@@ -35,69 +35,104 @@ points INTEGER DEFAULT 0
 """)
 conn.commit()
 
-cooldown={}
+# ================= ANTI SPAM =================
+cooldown = {}
+
 def anti(uid):
-    now=time.time()
-    if uid in cooldown and now-cooldown[uid]<2:
+    now = time.time()
+    if uid in cooldown and now - cooldown[uid] < 2:
         return False
-    cooldown[uid]=now
+    cooldown[uid] = now
     return True
 
-
-def menu(uid):
+# ================= MENU =================
+def menu():
     return ReplyKeyboardMarkup(
-        [["💰 المهام","👤 حسابي"]],
+        [
+            ["💰 المهام", "👤 حسابي"]
+        ],
         resize_keyboard=True
     )
 
-
-async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    uid=update.effective_user.id
+# ================= START =================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
 
     cursor.execute(
         "INSERT OR IGNORE INTO users(user_id,points) VALUES(?,0)",
-        (uid,))
+        (uid,)
+    )
     conn.commit()
 
     await update.message.reply_text(
-        "👑 البوت يعمل بنجاح",
-        reply_markup=menu(uid)
+        "👑 البوت يعمل بنجاح ✅",
+        reply_markup=menu()
     )
 
+# ================= USER =================
+async def user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-async def user(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    uid=update.effective_user.id
+    if not update.message:
+        return
+
+    uid = update.effective_user.id
 
     if not anti(uid):
         return
 
-    if update.message.text=="👤 حسابي":
+    text = update.message.text
+
+    if text == "👤 حسابي":
+
         cursor.execute(
-            "SELECT points FROM users WHERE user_id=?",(uid,))
-        pts=cursor.fetchone()[0]
+            "SELECT points FROM users WHERE user_id=?",
+            (uid,)
+        )
+
+        row = cursor.fetchone()
+
+        if not row:
+            return
+
+        pts = row[0]
 
         await update.message.reply_text(
             f"💰 نقاطك: {pts}"
         )
 
+# ================= CALLBACK =================
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("✅ تم التنفيذ")
 
-async def buttons(update:Update,context:ContextTypes.DEFAULT_TYPE):
-    q=update.callback_query
-    await q.answer()
-    await q.edit_message_text("✅ تم")
+# ================= ERROR HANDLER =================
+async def error_handler(update, context):
+    print(f"ERROR: {context.error}")
 
-
+# ================= MAIN =================
 def main():
-    app=Application.builder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start",start))
-    app.add_handler(MessageHandler(filters.TEXT,user))
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            user
+        )
+    )
+
     app.add_handler(CallbackQueryHandler(buttons))
 
-    print("BOT STARTED")
+    app.add_error_handler(error_handler)
 
-    app.run_polling()
+    print("✅ BOT STARTED SUCCESSFULLY")
 
+    app.run_polling(
+        drop_pending_updates=True
+    )
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
